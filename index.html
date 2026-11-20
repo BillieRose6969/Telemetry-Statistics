@@ -4,14 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Rendimiento - Procesadores</title>
-    <link rel="stylesheet" href="style.css?v=3.2">
+    <link rel="stylesheet" href="style.css?v=3.4">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     <!-- PapaParse -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
-     <!-- SheetJS (Motor para exportar a Excel) -->
+    <!-- SheetJS (Motor para exportar a Excel) -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js" defer></script>
-    <script src="app.js?v=3.2" defer></script>
+    <!-- jsPDF & html2canvas (Motores para Expedientes PDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+    <script src="app.js?v=3.4" defer></script>
 </head>
 <body>
     <div id="bootScreen" class="boot-screen">
@@ -49,13 +52,19 @@
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <div class="tooltip-wrapper">
                         <button id="btnDescargarGlobal" class="btn-export-arasaka">
-                            🗃️ EXPORTAR CSV (ADMIN)
+                            🗃️ EXPORTAR CSV
                         </button> 
                     </div>
 
                     <div class="tooltip-wrapper">
                         <button id="btnAdminPersonal" class="btn-export-arasaka" style="border-color: #00ffaa; color: #00ffaa;">
                             ⚙️ ASIGNAR SECTORES
+                        </button>
+                    </div>
+
+                    <div class="tooltip-wrapper">
+                        <button id="btnAbrirAuditoriaCiega" class="btn-export-arasaka" style="border-color: #00ffff; color: #00ffff;">
+                             AUDITORÍA GLOBAL
                         </button>
                     </div>
                     
@@ -137,6 +146,7 @@
             </div>
         </section>
 
+        <!-- SECCIÓN INDIVIDUAL PARA EL PDF -->
         <section class="individual-stats card" id="seccionIndividual">
             <h2>Rendimiento Individual</h2>
             
@@ -150,19 +160,17 @@
                         <button id="btnAbrirDescargo" class="btn-evidencia" style="border-color: #ffaa00; color: #ffaa00;">
                             ⚖️ INGRESAR DESCARGO
                         </button>
-                        <button id="btnDescargarIndividual" class="btn-submit btn-sm btn-individual">
-                            📄 EXPORTAR DATOS
+                        <button id="btnGenerarExpedientePDF" class="btn-submit btn-sm btn-individual" style="background: #000; border-color: #fff; color: #fff;">
+                            📑 GENERAR EXPEDIENTE PDF
                         </button>
                     </div>
                 </div>
 
-                
                 <div id="descargosViewer" style="display: none; margin-bottom: 25px; padding: 15px; border: 1px dashed #ffaa00; background: rgba(255, 170, 0, 0.05);">
                     <h4 style="color: #ffaa00; margin-bottom: 10px; font-family: var(--font-mono); text-transform: uppercase;">> Estado de Apelaciones</h4>
                     <ul id="listaDescargosVisor" style="list-style: none; padding: 0; font-family: var(--font-mono); font-size: 0.85rem; color: #ccc;"></ul>
                 </div>
 
-                
                 <div class="chart-wrapper" style="margin-bottom: 20px;">
                     <h3>Evolución Semanal de Rendimiento</h3>
                     <canvas id="evolucionChart"></canvas>
@@ -200,10 +208,18 @@
         </section>
     </main>
 
+    <!-- 1. GALERÍA DE EVIDENCIAS MEJORADA (CON FILTRO) -->
     <div id="imageModal" class="modal">
         <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2 id="modalTitle">Galería de Evidencias</h2>
+            <div class="modal-header-controls">
+                <h2 id="modalTitle">Galería de Evidencias</h2>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <select id="galleryFilter" class="input-terminal" style="max-width: 250px; border-color: #ffaa00; color: #ffaa00;">
+                        <option value="ALL">-- TODAS LAS FALLAS --</option>
+                    </select>
+                    <span class="close-modal">&times;</span>
+                </div>
+            </div>
             <div class="carousel-container">
                 <button id="prevBtn" class="carousel-btn" style="display: none;">&#10094;</button>
                 <div id="modalGallery" class="modal-gallery"></div>
@@ -213,7 +229,6 @@
         </div>
     </div>
     
-    
     <div id="historicalModal" class="modal terminal-modal">
         <div class="terminal-content">
             <div class="terminal-header">
@@ -222,7 +237,7 @@
             </div>
             <div class="terminal-body">
                 <div class="terminal-controls">
-                    <label>> SELECCIONE CICLO DE EXTRACCIÓN:</label>
+                    <label for="historialSelect">> SELECCIONE CICLO DE EXTRACCIÓN:</label>
                     <select id="historialSelect" class="input-terminal">
                         <option value="">-- ESPERANDO CONEXIÓN --</option>
                     </select>
@@ -236,7 +251,6 @@
         </div>
     </div>
 
-    
     <div id="descargoModal" class="modal terminal-modal">
         <div class="terminal-content" style="border-color: #ffaa00; max-width: 600px;">
             <div class="terminal-header" style="border-bottom-color: #ffaa00;">
@@ -251,6 +265,7 @@
             </div>
         </div>
     </div>
+
     <div id="personalModal" class="modal terminal-modal">
         <div class="terminal-content" style="border-color: #00ffaa; max-width: 800px;">
             <div class="terminal-header" style="border-bottom-color: #00ffaa;">
@@ -271,7 +286,6 @@
                         </tr>
                     </thead>
                     <tbody id="tablaPersonalBody">
-                        
                     </tbody>
                 </table>
                 <button onclick="location.reload()" class="btn-terminal" style="margin-top: 20px; background: #001a0d; border-color: #00ffaa; color: #00ffaa; width: 100%; font-size: 1rem; padding: 12px; cursor: pointer;">
@@ -280,5 +294,43 @@
             </div>
         </div>
     </div>
+
+    <!-- 2. MÓDULO DE AUDITORÍA GLOBAL -->
+    <div id="blindAuditModal" class="modal terminal-modal">
+        <div class="terminal-content" style="border-color: #00ffff; max-width: 1100px;">
+            <div class="terminal-header" style="border-bottom-color: #00ffff;">
+                <span class="terminal-title" style="color: #00ffff;">> DASHBOARD // AUDITORÍA GLOBAL</span>
+                <span class="close-blind-audit close-terminal" style="color: #00ffff;">&times;</span>
+            </div>
+            <div class="terminal-body">
+                <div class="terminal-controls" style="flex-direction: column; gap: 10px;">
+                    <div style="display: flex; gap: 10px; width: 100%;">
+                        <select id="blindAuditSector" class="input-terminal" style="border-color: #00ffff; color: #00ffff; flex: 1;">
+                            <option value="">[ TODOS LOS SECTORES ]</option>
+                            <option value="fotomulta">FOTOMULTA</option>
+                            <option value="fotomarca">FOTOMARCA</option>
+                            <option value="radares">RADARES</option>
+                            <option value="revisado">REVISADO</option>
+                            <option value="carroussel">CARROUSSEL</option>
+                        </select>
+                        <select id="blindAuditFalla" class="input-terminal" style="border-color: #00ffff; color: #00ffff; flex: 2;">
+                            <option value="">-- SELECCIONE CATÁLOGO DE FALLA --</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 10px; width: 100%; align-items: center;">
+                        <span style="color: #00ffff; font-size: 0.8rem; font-weight: bold;">> DESDE:</span>
+                        <input type="date" id="auditFechaDesde" class="input-terminal" style="border-color: #00ffff; color: #00ffff; flex: 1;">
+                        <span style="color: #00ffff; font-size: 0.8rem; font-weight: bold;">> HASTA:</span>
+                        <input type="date" id="auditFechaHasta" class="input-terminal" style="border-color: #00ffff; color: #00ffff; flex: 1;">
+                        <button id="btnEjecutarBlindAudit" class="btn-terminal" style="border-color: #00ffff; color: #00ffff; flex: 1;">[ EJECUTAR BÚSQUEDA ]</button>
+                    </div>
+                </div>
+                <div class="terminal-screen" id="blindAuditScreen" style="border-color: #008888; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; padding: 15px;">
+                    <p class="blinking-cursor" style="grid-column: 1 / -1; color: #00ffff;">> ESPERANDO PARÁMETROS DE BÚSQUEDA GLOBAL...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
